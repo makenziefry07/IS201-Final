@@ -1,0 +1,43 @@
+body{
+    font-family: Papyrus, Georgia, 'Times New Roman', Times, serif;
+    background-color: rgb(177, 88, 241);
+    color: black;
+    background-image: url("../assets/img/home-bg.jpg");
+    background-repeat: no-repeat;
+    background-size: cover;
+
+}
+a{
+    color: black;
+    background-color: gray;
+}
+h1,h2{
+    text-align: center;
+}
+img{
+    border: 5px solid orange;
+    padding: 5px; 
+    height: 250px;
+    margin: auto;
+    /* display: block; */
+}
+.rizz{
+    font-family: chiller;
+    color: hotpink;
+    border: 5px dashed yellow;
+    font-size: xx-large;
+    font-weight: bolder;
+    background-color: limegreen;
+}
+.rizz:hover{
+    font-size: 450%;
+    color: red;
+    border: 5px solid cyan;
+}
+li{
+    width: fit-content;
+}
+li:hover{
+    text-decoration: underline;
+    background-color: rgb(101, 101, 101);
+}
