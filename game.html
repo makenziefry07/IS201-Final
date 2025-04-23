@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crack the Screen</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            background-color: #f0f0f0; /* Light background for visibility */
+            font-family: sans-serif; /* Basic font */
+        }
+        canvas {
+            display: block; /* Remove extra space below canvas */
+            cursor: crosshair;
+        }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">
+        Click anywhere to create cracks. <br>
+        Move the mouse rapidly over cracks to make them disappear.
+    </div>
+    <canvas id="crackCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('crackCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Configuration ---
+        const MAX_CRACK_RADIUS = 180; // Max distance cracks spread (pixels, approx 2-4 inches)
+        const CRACK_COLOR = 'rgba(0, 0, 0, 0.6)'; // Color of the cracks
+        const CRACK_LINE_WIDTH = 1;
+        const HEAL_SPEED_THRESHOLD = 1500; // Pixels per second squared (adjust for sensitivity)
+        const HEAL_RADIUS = 50; // How close the mouse needs to be to heal
+        const FADE_SPEED = 0.01; // How quickly cracks fade when healing
+
+        let cracks = []; // Stores all active crack systems
+        let lastMousePos = { x: 0, y: 0, time: Date.now() };
+        let mouseSpeed = 0;
+
+        // --- Canvas Setup ---
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawCracks(); // Redraw existing cracks on resize
+        }
+
+        // --- Crack Generation ---
+        function createCrackSystem(startX, startY) {
+            const system = {
+                originX: startX,
+                originY: startY,
+                lines: [],
+                globalAlpha: 1.0 // Overall opacity for fading
+            };
+
+            const numPrimaryLines = 5 + Math.random() * 5; // 5 to 10 main lines
+
+            for (let i = 0; i < numPrimaryLines; i++) {
+                createCrackLine(system, startX, startY, Math.random() * Math.PI * 2, MAX_CRACK_RADIUS);
+            }
+            cracks.push(system);
+        }
+
+        function createCrackLine(system, x, y, angle, remainingLength) {
+            if (remainingLength <= 0) return;
+
+            const segmentLength = 10 + Math.random() * 20; // Length of this segment
+            const nextLength = Math.min(segmentLength, remainingLength);
+
+            // Add randomness to angle
+            angle += (Math.random() - 0.5) * 0.5; // Deviate angle slightly
+
+            const endX = x + Math.cos(angle) * nextLength;
+            const endY = y + Math.sin(angle) * nextLength;
+
+            // Check if the new point is too far from the origin
+            const distFromOrigin = Math.sqrt(Math.pow(endX - system.originX, 2) + Math.pow(endY - system.originY, 2));
+            if (distFromOrigin > MAX_CRACK_RADIUS) {
+                 // Adjust end point to stay within radius
+                 const ratio = MAX_CRACK_RADIUS / distFromOrigin;
+                 const clampedEndX = system.originX + (endX - system.originX) * ratio;
+                 const clampedEndY = system.originY + (endY - system.originY) * ratio;
+                 if (Math.sqrt(Math.pow(clampedEndX - x, 2) + Math.pow(clampedEndY - y, 2)) > 5) { // Only add if segment is long enough
+                    system.lines.push({ x1: x, y1: y, x2: clampedEndX, y2: clampedEndY });
+                 }
+                 return; // Stop this line
+            }
+
+
+            system.lines.push({ x1: x, y1: y, x2: endX, y2: endY });
+
+            // Continue the line
+            createCrackLine(system, endX, endY, angle, remainingLength - nextLength);
+
+            // Chance to branch
+            if (Math.random() < 0.2 && remainingLength > 30) { // Branch probability
+                createCrackLine(system, endX, endY, angle + (Math.random() - 0.5) * 1.5, remainingLength * (0.3 + Math.random() * 0.4));
+            }
+        }
+
+        // --- Drawing ---
+        function drawCracks() {
+            // Clear canvas (optional, depends if you want cracks to layer or replace)
+            // If you want cracks to persist visually until healed, clear only when needed.
+            // For this version, we clear and redraw each frame for the fade effect.
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.lineWidth = CRACK_LINE_WIDTH;
+
+            cracks.forEach(system => {
+                if (system.globalAlpha <= 0) return; // Skip fully faded cracks
+
+                ctx.strokeStyle = `rgba(0, 0, 0, ${0.6 * system.globalAlpha})`; // Apply fade
+                ctx.beginPath();
+                system.lines.forEach(line => {
+                    ctx.moveTo(line.x1, line.y1);
+                    ctx.lineTo(line.x2, line.y2);
+                });
+                ctx.stroke();
+            });
+        }
+
+        // --- Healing Logic ---
+        function calculateMouseSpeed(e) {
+            const now = Date.now();
+            const dt = Math.max(1, now - lastMousePos.time); // Avoid division by zero (milliseconds)
+            const dx = e.clientX - lastMousePos.x;
+            const dy = e.clientY - lastMousePos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Speed in pixels per second
+            mouseSpeed = (distance / dt) * 1000;
+
+            lastMousePos = { x: e.clientX, y: e.clientY, time: now };
+        }
+
+        function healCracks() {
+            if (mouseSpeed < HEAL_SPEED_THRESHOLD) return; // Only heal if moving fast
+
+            const healX = lastMousePos.x;
+            const healY = lastMousePos.y;
+
+            cracks.forEach(system => {
+                // Check distance from mouse to crack origin
+                const distToOrigin = Math.sqrt(Math.pow(healX - system.originX, 2) + Math.pow(healY - system.originY, 2));
+
+                // Heal if mouse is fast AND near the crack system's origin + radius buffer
+                if (distToOrigin < MAX_CRACK_RADIUS + HEAL_RADIUS) {
+                    system.globalAlpha -= FADE_SPEED; // Fade the crack system
+                }
+            });
+
+            // Remove fully faded cracks
+            cracks = cracks.filter(system => system.globalAlpha > 0);
+        }
+
+
+        // --- Animation Loop ---
+        function animate() {
+            healCracks(); // Check for healing based on current speed
+            drawCracks(); // Redraw the current state
+            requestAnimationFrame(animate); // Loop
+        }
+
+        // --- Event Listeners ---
+        canvas.addEventListener('click', (e) => {
+            createCrackSystem(e.clientX, e.clientY);
+            // No need to call drawCracks here, animate loop handles it
+        });
+
+        canvas.addEventListener('mousemove', calculateMouseSpeed);
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Initialization ---
+        resizeCanvas(); // Set initial size
+        animate(); // Start the animation loop
+
+    </script>
+</body>
+</html>
